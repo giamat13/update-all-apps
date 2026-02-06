@@ -1,59 +1,47 @@
-# 🚀 Windows Auto-Updater Script
+@echo off
+[cite_start]:: בדיקה אם הסקריפט רץ כמנהל [cite: 1]
+net session >nul 2>&1
+if %errorlevel% neq 0 (
+    powershell -WindowStyle Hidden -Command "Start-Process 'cmd.exe' -ArgumentList '/c', '%~f0' -Verb RunAs"
+    exit
+)
 
-סקריפט Batch רב-עוצמה המיועד לאוטומציה מלאה של עדכוני תוכנה, סביבות פיתוח וחבילות מערכת ב-Windows. הסקריפט חוסך זמן יקר על ידי ריכוז כל פעולות התחזוקה במקום אחד.
+:: הרצה כמנהל
+echo Running as administrator...
 
----
+[cite_start]:: התקנת Winget ו-Scoop אם חסר [cite: 2, 3]
+echo Checking Winget and Scoop...
+where winget >nul 2>&1 || (powershell -NoProfile -ExecutionPolicy Bypass -Command "& { Invoke-WebRequest -Uri 'https://aka.ms/getwinget' -OutFile $env:TEMP\AppInstaller.appxbundle; Add-AppxPackage -Path $env:TEMP\AppInstaller.appxbundle }")
+where scoop >nul 2>&1 || (powershell -NoProfile -ExecutionPolicy Bypass -Command "iex (iwr 'https://get.scoop.sh' -UseBasicParsing).Content")
 
-## ✨ תכונות עיקריות
+[cite_start]:: הוספת מקורות ל-Scoop ו-Winget [cite: 3]
+echo Updating sources...
+powershell -NoProfile -ExecutionPolicy Bypass -Command "foreach ($bucket in @('extras','versions','nerd-fonts','games','nonportable')) { if (-not (scoop bucket list | Select-String $bucket)) { scoop bucket add $bucket } }"
 
-* **בדיקת הרשאות מנהל (Elevated Privileges):** הסקריפט מזהה אם הוא רץ ללא הרשאות ומשדרג את עצמו אוטומטית (Run as Admin).
-* **ניהול חבילות מערכת:**
-    * בדיקה והתקנה אוטומטית של **Winget** ו-**Scoop** אם הם חסרים.
-    * הוספת מאגרי תוכנה (Buckets) חיוניים ל-Scoop (`extras`, `versions`, `nerd-fonts`, `games`, `nonportable`).
-    * עדכון שקט וגורף לכל האפליקציות המותקנות דרך מנהלי החבילות.
-* **סביבות פיתוח (DevOps & Programming):**
-    * **Node.js/NPM:** עדכון גירסת ה-NPM והחבילות הגלובליות.
-    * **Python/Pip:** שדרוג ה-Pip עצמו ועדכון אוטומטי של כל חבילות ה-Python המותקנות במערכת.
+[cite_start]:: עדכון אפליקציות מערכת (Winget & Scoop) [cite: 3]
+echo Updating system packages...
+winget upgrade --all --include-unknown --accept-package-agreements --accept-source-agreements --silent
+scoop update && scoop update *
 
----
+:: --- עדכוני פיתוח (חדש) ---
 
-## 🛠 הוראות שימוש
+:: עדכון NPM (גלובלי)
+where npm >nul 2>&1
+if %errorlevel% equ 0 (
+    echo Updating Global NPM packages...
+    call npm install -g npm@latest
+    call npm update -g
+)
 
-1.  העתק את קוד הסקריפט לקובץ טקסט חדש.
-2.  שמור את הקובץ עם סיומת `.bat` (לדוגמה: `UpdateAll.bat`).
-3.  הרץ את הקובץ בלחיצה כפולה.
-4.  אשר את חלונית ה-UAC במידה ותופיע.
+:: עדכון Python Packages (pip)
+where pip >nul 2>&1
+if %errorlevel% equ 0 (
+    echo Updating Python pip packages...
+    python -m pip install --upgrade pip
+    :: פקודה שמעדכנת את כל החבילות שמותקנות גלובלית
+    powershell -NoProfile -ExecutionPolicy Bypass -Command "pip list --outdated --format=json | ConvertFrom-Json | ForEach-Object { pip install --upgrade $_.name }"
+)
 
----
-
-## 🏗 זרימת העבודה (Workflow)
-
-
-
-1.  **שלב א':** אימות הרשאות מערכת.
-2.  **שלב ב':** סנכרון והתקנת תשתיות (Winget/Scoop).
-3.  **שלב ג':** עדכון תוכנות צד שלישי ומערכת.
-4.  **שלב ד':** עדכון חבילות פיתוח (NPM/PIP).
-5.  **שלב ה':** סיום והשארת הטרמינל פתוח לבדיקת לוגים.
-
----
-
-## 📜 דרישות קדם
-
-* **מערכת הפעלה:** Windows 10/11.
-* **גישה לאינטרנט:** נדרשת להורדת העדכונים.
-* **PowerShell:** מותקן כברירת מחדל.
-
----
-
-## ✍️ קרדיטים ותודות
-
-הפרויקט נוצר ושופר בשיתוף פעולה בין:
-* **giamat13**
-* **Claude AI**
-* **Gemini AI**
-
----
-
-> [!CAUTION]
-> **הצהרת אחריות:** השימוש בסקריפט הוא על אחריות המשתמש בלבד. מומלץ תמיד לגבות נתונים חשובים לפני ביצוע עדכוני מערכת גורפים.
+echo Done! Everything is up to date.
+[cite_start]:: פתיחת cmd אינטראקטיבי [cite: 3]
+cmd /k
