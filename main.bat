@@ -1,47 +1,69 @@
 @echo off
-[cite_start]:: בדיקה אם הסקריפט רץ כמנהל [cite: 1]
-net session >nul 2>&1
+setlocal enabledelayedexpansion
+
+:: --- בדיקת הרשאות מנהל (Administrator) ---
+openfiles >nul 2>&1
 if %errorlevel% neq 0 (
-    powershell -WindowStyle Hidden -Command "Start-Process 'cmd.exe' -ArgumentList '/c', '%~f0' -Verb RunAs"
-    exit
+    echo [!] Requesting Administrator privileges...
+    powershell -Command "Start-Process -FilePath '%0' -Verb RunAs"
+    exit /b
 )
 
-:: הרצה כמנהל
-echo Running as administrator...
+title Windows Dev Stack Updater
+echo ===================================================
+echo        System and Dev Environment Auto-Updater
+echo ===================================================
+echo.
 
-[cite_start]:: התקנת Winget ו-Scoop אם חסר [cite: 2, 3]
-echo Checking Winget and Scoop...
-where winget >nul 2>&1 || (powershell -NoProfile -ExecutionPolicy Bypass -Command "& { Invoke-WebRequest -Uri 'https://aka.ms/getwinget' -OutFile $env:TEMP\AppInstaller.appxbundle; Add-AppxPackage -Path $env:TEMP\AppInstaller.appxbundle }")
-where scoop >nul 2>&1 || (powershell -NoProfile -ExecutionPolicy Bypass -Command "iex (iwr 'https://get.scoop.sh' -UseBasicParsing).Content")
+:: --- עדכון Winget ---
+echo [+] Checking Winget updates...
+where winget >nul 2>&1
+if %errorlevel% equ 0 (
+    echo Updating packages via Winget...
+    winget upgrade --all --include-unknown --accept-package-agreements --accept-source-agreements
+) else (
+    echo [!] Winget not found. Skipping...
+)
 
-[cite_start]:: הוספת מקורות ל-Scoop ו-Winget [cite: 3]
-echo Updating sources...
-powershell -NoProfile -ExecutionPolicy Bypass -Command "foreach ($bucket in @('extras','versions','nerd-fonts','games','nonportable')) { if (-not (scoop bucket list | Select-String $bucket)) { scoop bucket add $bucket } }"
+:: --- עדכון Scoop ---
+echo.
+echo [+] Checking Scoop updates...
+where scoop >nul 2>&1
+if %errorlevel% equ 0 (
+    :: Scoop לא תמיד אוהב לרוץ כאדמין ישיר, לכן נריץ דרך PowerShell
+    powershell -NoProfile -ExecutionPolicy Bypass -Command "scoop update; scoop update *"
+) else (
+    echo [!] Scoop not found. Skipping...
+)
 
-[cite_start]:: עדכון אפליקציות מערכת (Winget & Scoop) [cite: 3]
-echo Updating system packages...
-winget upgrade --all --include-unknown --accept-package-agreements --accept-source-agreements --silent
-scoop update && scoop update *
-
-:: --- עדכוני פיתוח (חדש) ---
-
-:: עדכון NPM (גלובלי)
+:: --- עדכוני פיתוח (NPM) ---
+echo.
+echo [+] Checking NPM global packages...
 where npm >nul 2>&1
 if %errorlevel% equ 0 (
-    echo Updating Global NPM packages...
+    echo Updating Global NPM...
     call npm install -g npm@latest
     call npm update -g
+) else (
+    echo [!] NPM not found. Skipping...
 )
 
-:: עדכון Python Packages (pip)
+:: --- עדכוני פיתוח (Python/PIP) ---
+echo.
+echo [+] Checking Python PIP packages...
 where pip >nul 2>&1
 if %errorlevel% equ 0 (
-    echo Updating Python pip packages...
+    echo Upgrading PIP...
     python -m pip install --upgrade pip
-    :: פקודה שמעדכנת את כל החבילות שמותקנות גלובלית
+    echo Upgrading all outdated global packages...
+    :: פקודה יעילה יותר לעדכון כל חבילות ה-PIP
     powershell -NoProfile -ExecutionPolicy Bypass -Command "pip list --outdated --format=json | ConvertFrom-Json | ForEach-Object { pip install --upgrade $_.name }"
+) else (
+    echo [!] PIP not found. Skipping...
 )
 
-echo Done! Everything is up to date.
-[cite_start]:: פתיחת cmd אינטראקטיבי [cite: 3]
-cmd /k
+echo.
+echo ===================================================
+echo   Update Complete! All systems are up to date.
+echo ===================================================
+pause
