@@ -66,4 +66,4 @@ echo.
 echo ===================================================
 echo   Update Complete! All systems are up to date.
 echo ===================================================
-pause
+cmd /k
